@@ -3,7 +3,7 @@
 
 #---モデルラン
 
-#---2024-10-21-Monday
+#---2024-10-24-Wednesday
 
 #-------------------------------------------------------------------------------
 #setwd("C:/Users/njiro/OneDrive/O_DRV/WD/R_WD/lsn/matsu/MLR5")
@@ -15,10 +15,10 @@ wd <- getwd()
 #---パッケージ読込
 library(tidyverse)
 #library(ggplot2)
-library(GGally)
+#library(GGally)
 #library(ellipse)
 #library(gridExtra)
-#library(rstan)
+library(rstan)
 #library(ggmcmc)
 
 #-------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ setting <- function(){
 #-------------------------------------------------------------------------------
 #---パラメータリスト設定関数
 set_par <- function(){
-  par <- c("b1", "b2", "b3", "sigma")
+  par <- c("b1", "b2", "b3")
   return(par)
 }
 
@@ -62,8 +62,70 @@ rd_csv <- function(path, filename){
 }
 
 #-------------------------------------------------------------------------------
+#---stan出力記録関数
+wr_stan <- function(path, filename){
+  save.image(
+    file = paste0(
+      path,
+      "/",
+      filename
+    )
+  )
+}
+
+#-------------------------------------------------------------------------------
+#---stanコンパイル関数
+cmpl_stan <- function(path, filename){
+  df <- stan_model(
+    file = paste0(
+      path,
+      "/",
+      filename
+    )
+  )
+  return(df)
+}
+
+#-------------------------------------------------------------------------------
+#---パラメータリスト設定関数
+set_par <- function(){
+  par <- c("b1", "b2", "b3")
+  return(par)
+}
+
+#-------------------------------------------------------------------------------
+#---パラメータ初期設定関数
+set_parini <- function(){
+  par_ini <- list(
+    b1 = runif(1, -10, 10),
+    b2 = runif(1, 0, 10),
+    b3 = runif(1, 0, 10),
+  )
+  return(par_ini)
+}
+
+#-------------------------------------------------------------------------------
+#---stanサンプリング関数
+smp_stan <- function(model, data, pars, parameter_list, seed, chain, iter, warmup, thin){
+  fit <- sampling(
+    model,
+    data = data,
+    #pars = pars,
+    #init = function(){parameter_list},
+    seed = seed,
+    chain = chain,
+    iter = iter,
+    warmup = warmup,
+    thin = thin
+  )
+  return(fit)
+}
+
+
+#-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 #---main program
+
 #-------------------------------------------------------------------------------
 #---初期設定
 set <- setting()
@@ -76,3 +138,46 @@ df <- rd_csv(ipnm1, ifnm1) |>
   select(-1)
 
 head(df)
+
+#-------------------------------------------------------------------------------
+data <- list(
+  N = nrow(df),
+  A = df$A,
+  Score = df$Score / 200,
+  M = df$M,
+  Y = df$Y
+)
+
+#-------------------------------------------------------------------------------
+#---stanモデルの実行
+#---stanファイルのコンパイル
+ipnm2 <- mdl
+ifnm2 <- "BNL5_model1.stan"
+stanmodel <- cmpl_stan(ipnm2, ifnm2)
+
+#---サンプリング
+fit <- smp_stan(
+  stanmodel, 
+  data = data, 
+  #pars = pars, 
+  #parameter_list = par_ini, 
+  
+  chain = set$chain, 
+  seed = set$seed, 
+  iter = set$iter, 
+  warmup = set$warmup, 
+  thin = set$thin
+)
+
+#---サンプル抽出
+fit
+ms <- rstan::extract(fit)
+#head(ms)
+
+#-------------------------------------------------------------------------------
+#---stan結果出力
+opnm1 <- outdt
+ofnm1 <- "BNL5_result.RData"
+wr_stan(opnm1, ofnm1)
+fit
+
